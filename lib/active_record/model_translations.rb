@@ -6,13 +6,21 @@ module ActiveRecord
 
     module ClassMethods
       def translates(*attributes)
-        attributes = attributes.map{|attribute| attribute.to_sym}
-
+        attributes = attributes.map{ |attribute| attribute.to_sym }
+        
         unless included_modules.include? InstanceMethods
           include InstanceMethods
-
+          
           define_method :translated_attributes do
             @translated_attributes
+          end
+          
+          define_method :cached_translations do
+            type = self.class.to_s.downcase
+            Rails.cache.fetch "#{type}_translations.#{id}" do
+              statement = "SELECT * FROM #{type}_translations WHERE #{type}_id = #{id}"
+              ActiveRecord::Base.connection.select_all(statement)
+            end
           end
 
           after_save do |record|
@@ -21,14 +29,11 @@ module ActiveRecord
 
           define_method :locales do
             return [] if new_record?
-            type = self.class.to_s.downcase
-            statement = "SELECT * FROM #{type}_translations WHERE #{type}_id = #{id}"
-            logger.debug(statement)
-            translations = ActiveRecord::Base.connection.select_all(statement)
-            translations.map{|t| t['locale'].to_sym}.select{|locale| I18n.locales.include?(locale)}
+            cached_translations.map { |t| t[:locale].to_sym}.select{ |locale| I18n.locales.include?(locale) }
           end
+        
         end
-
+        
         attributes.each do |attribute|
           define_method "#{attribute}=".to_sym do |value|
             @translated_attributes ||= {}
@@ -36,34 +41,26 @@ module ActiveRecord
           end
 
           define_method attribute do
-            @translated_attributes ||= {}
-            return @translated_attributes[attribute] if @translated_attributes[attribute]
             return nil if new_record?
-            type = self.class.to_s.downcase
-            statement = "SELECT * FROM #{type}_translations WHERE #{type}_id = #{id}"
-            logger.debug(statement)
-            translations = ActiveRecord::Base.connection.select_all(statement)
-            translation = translations.find{|t| t["locale"] == I18n.locale.to_s}
-            translation = translations.find{|t| t["locale"] == I18n.default_locale.to_s} unless translation
-            translation = translations.first unless translation
-            if translation
-              translation.
-                select{|k, v| attributes.include?(k.to_sym) && !@translated_attributes.keys.include?(k.to_sym)}.
-                each{|k, v| @translated_attributes[k.to_sym] = v}
+            translation = Rails.cache.fetch "#{self.class.to_s.downcase}_translations.#{id}.#{attribute}.#{I18n.locale}" do                          
+              cached_translations.detect { |t| t['locale'] == I18n.locale.to_s } ||
+              cached_translations.detect { |t| t['locale'] == I18n.default_locale.to_s } ||
+              cached_translations.detect { |t| t['locale'] == '' } || # not useful for everyone
+              cached_translations.first
             end
-            @translated_attributes[attribute]
+            translation && translation[attribute.to_s]
           end
         end
+          
       end
     end
 
     module InstanceMethods
       def update_translations!
-        return unless @translated_attributes and not @translated_attributes.empty?
+        return if @translated_attributes.nil? || @translated_attributes.empty?
         type = self.class.to_s.downcase
         statement = "SELECT * FROM #{type}_translations WHERE #{type}_id = #{id} AND locale = '#{I18n.locale}'"
-        logger.debug(statement)
-        translation = ActiveRecord::Base.connection.select_all(statement).first
+        translation = ActiveRecord::Base.connection.select_one(statement)
         if translation
           statement = "UPDATE #{type}_translations SET "
           statement << "updated_at = '#{DateTime.now.to_s(:db)}', "
@@ -82,8 +79,13 @@ module ActiveRecord
             "\"#{v}\""
           end.join(', ') + ")"
         end
-        logger.debug(statement)
         ActiveRecord::Base.connection.execute(statement)
+        
+        # clear related cached
+        Rails.cache.delete "#{type}_translations.#{id}"
+        @translated_attributes.each do |attribute|
+          Rails.cache.delete "#{type}_translations.#{id}.#{attribute}.#{I18n.locale}"
+        end
       end
     end
   end
