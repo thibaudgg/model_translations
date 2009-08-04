@@ -50,7 +50,7 @@ module ActiveRecord
       def update_translations!
         unless translated_attributes.empty?
           # clear related cached
-          @translated_attributes.each do |attribute|
+          translated_attributes.each do |attribute|
             Rails.cache.delete "#{self.class.to_s.downcase}_translations.#{id}.#{attribute}.#{I18n.locale}"
           end
           # update or create translation
