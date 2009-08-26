@@ -2,12 +2,14 @@ module ActiveRecord
   module ModelTranslations
     module ClassMethods
       def translates(*attributes)
-        add_translation_model_and_logic unless included_modules.include?(InstanceMethods)
+        attributes = attributes.collect{ |attribute| attribute.to_sym }
+        
+        add_translation_model_and_logic(attributes) unless included_modules.include?(InstanceMethods)
         add_translatable_attributes(attributes)
       end
       
-      private
-      def add_translation_model_and_logic
+    private
+      def add_translation_model_and_logic(attributes)
         type = self.to_s.underscore
         translation_class_name = "#{self.to_s}Translation"
         translation_class = Class.new(ActiveRecord::Base) { belongs_to type.to_sym }
@@ -20,7 +22,6 @@ module ActiveRecord
       end
       
       def add_translatable_attributes(attributes)
-        attributes = attributes.collect{ |attribute| attribute.to_sym }
         attributes.each do |attribute|
           define_method "#{attribute}=" do |value|
             translated_attributes[attribute] = value
@@ -55,7 +56,9 @@ module ActiveRecord
           end
           # update or create translation
           translation = translations.find_or_initialize_by_locale(I18n.locale.to_s)
-          translation.attributes = translation.attributes.merge(translated_attributes)
+          translated_attributes.each do |attribute, translation_string|
+            translation.send("#{attribute}=", translation_string)
+          end
           translation.save!
         end
       end
