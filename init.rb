@@ -1,1 +1,1 @@
-ActiveRecord::Base.send :extend, ModelTranslations
+require File.dirname(__FILE__) + "/rails/init"
