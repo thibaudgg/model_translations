@@ -5,7 +5,15 @@ required.
 
 ## Installation
 
-    script/plugin install git://github.com/janne/model_translations.git
+### Gem:
+
+in config/environment.rb:
+
+    config.gem 'model_translations', :source => 'http://gemcutter.org'
+
+### Plugin:
+
+    script/plugin install git://github.com/guillaumegentil/model_translations.git
 
 ## Implementation
 
