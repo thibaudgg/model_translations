@@ -52,7 +52,7 @@ module ActiveRecord
         unless translated_attributes.empty?
           # clear related cached
           translated_attributes.each do |attribute|
-            Rails.cache.delete "#{self.class.to_s.downcase}_translations.#{id}.#{attribute}.#{I18n.locale}"
+            Rails.cache.delete "#{self.class.to_s.downcase}_translations.#{id}.#{attribute.first}.#{I18n.locale}"
           end
           # update or create translation
           translation = translations.find_or_initialize_by_locale(I18n.locale.to_s)
