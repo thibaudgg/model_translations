@@ -1,1 +1,1 @@
-ActiveRecord::Base.send :extend, ActiveRecord::ModelTranslations::ClassMethods
+ActiveRecord::Base.send :extend, ModelTranslations
