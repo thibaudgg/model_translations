@@ -9,7 +9,7 @@ required.
 
 in config/environment.rb:
 
-    config.gem 'model_translations', :source => 'http://gemcutter.org'
+    config.gem 'model_translations'
 
 ### Plugin:
 
